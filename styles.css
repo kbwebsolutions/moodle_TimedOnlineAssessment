@@ -1,0 +1,27 @@
+#countdownclock {
+        position: fixed;
+        bottom: 0;
+        z-index:999;
+}
+#countdownclock #timer div {
+    background-color: #D93760;
+    color: #fff;
+    width: 90px;
+    height: 80px;
+    border-radius: 5px;
+    font-size: 25px;
+    font-weight: 700;
+    margin-left: 10px;
+    margin-right: 10px;
+    margin-top: 20px;
+    margin-bottom: 20px;
+    position: float
+
+}
+#countdownclock #timer div span {
+    display: block;
+    margin-top: -2px;
+    font-size: 15px;
+    font-weight: 500;
+    position: float
+}
