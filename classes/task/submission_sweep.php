@@ -55,15 +55,18 @@ class submission_sweep extends \core\task\scheduled_task {
                         ON ctx.id =  eas.contextid
                       JOIN {course_modules} cm
                         ON cm.id = ctx.instanceid
-                     WHERE eas.id IN (
+                     WHERE cm.instance = :assignment
+                       AND eas.id IN (
                               SELECT MAX(id)
                                 FROM {editor_atto_autosave}
                                WHERE elementid = 'id_responsetext_editor'
                                  AND userid = :userid
-
                     )";
-            $params = ['userid' => $submission->userid ];
+            $params = ['userid' => $submission->userid, 'assignment' => $submission->assignment ];
             $autosave = $DB->get_record_sql($sql, $params);
+            if (!isset($autosave->drafttext) || mb_strlen($autosave->drafttext) < 1) {
+                continue;
+            }
             $data = (object) [
                 "assignment" => $submission->assignment,
                 "submission" => $submission->submissionid,

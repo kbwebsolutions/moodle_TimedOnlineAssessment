@@ -24,6 +24,8 @@
 
 defined('MOODLE_INTERNAL') || die();
 
-$plugin->version   = 2021081600;
+$plugin->version   = 2021102700;
 $plugin->requires  = 2019111809;
 $plugin->component = 'assignsubmission_timedonline';
+$plugin->maturity  = MATURITY_BETA;
+

@@ -29,8 +29,8 @@ require_once(__DIR__ . '/../../../../config.php');
 require_once($CFG->dirroot . '/mod/assign/externallib.php');
 require_login();
 
-$responsetext = $_REQUEST['responsetext'];
-$assignmentid     = $_REQUEST['assignmentid'];
+$responsetext = optional_param('responsetext', '', PARAM_TEXT);
+$assignmentid = optional_param('assignmentid', '', PARAM_INT);
 
 $params = ['assignment' => $assignmentid, 'groupid' => 0, 'userid' => $USER->id];
 try {
@@ -43,11 +43,21 @@ try {
         'relateduserid' => $USER->id,
         'other' => $other
     ];
-    $sweptevent = \assignsubmission_timedonline\event\auto_submitted::create($eventdata);
-    $sweptevent->trigger();
 
-    $submissions = $DB->get_records('assign_submission', $params, 'attemptnumber DESC', '*', 0, 1);
+    $sql = 'SELECT *
+              FROM {assign_submission}
+             WHERE assignment = :assignment
+               AND groupid = :groupid
+               AND userid = :userid
+               AND status != "submitted"
+          ORDER BY attemptnumber DESC';
+    $submissions = $DB->get_records_sql($sql, $params, 0, 1);
+    if (! $submissions) {
+        return false;
+    }
     $submission = reset($submissions);
+    $autosubmitevent = \assignsubmission_timedonline\event\auto_submitted::create($eventdata);
+    $autosubmitevent->trigger();
 
     $data = (object) [
         "assignment" => $assignmentid,
