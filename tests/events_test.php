@@ -52,27 +52,40 @@ class events_test extends advanced_testcase {
 
         $submission = $assign->get_user_submission($student->id, true);
         // Ensure they have run out of time so the draft will be submitted.
-        $params = [
+        $submissionparams = [
             'id' => $submission->id,
             'timecreated' => (time() - 1626948853)
         ];
-        $DB->update_record('assign_submission', $params);
+        $DB->update_record('assign_submission', $submissionparams);
 
-        $params = [
+        $autosaveparams = [
             'elementid' => 'id_responsetext_editor',
             'userid' => $student->id,
             'contextid' => $context->id,
-            'drafttext' => 'student response'
+            'drafttext' => ' '
         ];
-        $DB->insert_record('editor_atto_autosave', $params);
+        $DB->insert_record('editor_atto_autosave', $autosaveparams);
 
-        $params = [
+        $statusparams = [
             'userid' => $student->id,
             'assignment' => $context->id,
             'timestarted' => (time() - 1626948853)
         ];
 
-        $DB->insert_record('timedonline_status', $params);
+        $DB->insert_record('timedonline_status', $statusparams);
+
+        $sink = $this->redirectEvents();
+        $task = \core\task\manager::get_scheduled_task('assignsubmission_timedonline\task\submission_sweep');
+        $task->execute();
+        $events = $sink->get_events();
+        // Notification, Submitted, and Swept.
+        $this->assertCount(0, $events, 'Submission should not happen with blank draft text');
+        $response = $DB->get_records('assignsubmission_timedonline');
+        $this->assertEmpty($response);
+
+        $autosaveparams['drafttext'] = 'student submission';
+        $DB->delete_records('editor_atto_autosave');
+        $DB->insert_record('editor_atto_autosave', $autosaveparams);
 
         $sink = $this->redirectEvents();
         $task = \core\task\manager::get_scheduled_task('assignsubmission_timedonline\task\submission_sweep');
@@ -80,7 +93,9 @@ class events_test extends advanced_testcase {
         $events = $sink->get_events();
         // Notification, Submitted, and Swept.
         $this->assertCount(3, $events);
-
+        $response = $DB->get_records('assignsubmission_timedonline');
+        $response = reset($response);
+        $this->assertEquals('student submission', $response->responsetext);
     }
 
     /**

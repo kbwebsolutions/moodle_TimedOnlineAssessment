@@ -64,7 +64,7 @@ class submission_sweep extends \core\task\scheduled_task {
                     )";
             $params = ['userid' => $submission->userid, 'assignment' => $submission->assignment ];
             $autosave = $DB->get_record_sql($sql, $params);
-            if (!isset($autosave->drafttext) || mb_strlen($autosave->drafttext) < 1) {
+            if (!isset($autosave->drafttext) || ctype_space($autosave->drafttext)) {
                 continue;
             }
             $data = (object) [

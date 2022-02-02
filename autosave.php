@@ -64,6 +64,8 @@ try {
         "submission" => $submission->id,
         "responsetext" => $responsetext,
         "responsetextformat" => FORMAT_HTML,
+        "timestarted" => time(),
+        "timefinished" => time()
     ];
 
     $DB->insert_record("assignsubmission_timedonline", $data);
