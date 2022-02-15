@@ -40,7 +40,9 @@ class events_test extends advanced_testcase {
         global $DB;
         $this->resetAfterTest();
         $course = $this->getDataGenerator()->create_course();
-        $student = $this->getDataGenerator()->create_and_enrol($course, 'student');
+        $student1 = $this->getDataGenerator()->create_and_enrol($course, 'student');
+        $student2 = $this->getDataGenerator()->create_and_enrol($course, 'student');
+
         $params = [
                'assignsubmission_timedonline_enabled' => 1,
                'assignsubmission_timedonline_timelimit' => 1
@@ -48,54 +50,76 @@ class events_test extends advanced_testcase {
         $assign = $this->create_instance($course, $params);
         $context = $assign->get_context();
 
-        $this->setUser($student->id);
+        $this->setAdminUser();
 
-        $submission = $assign->get_user_submission($student->id, true);
+        $submission1 = $assign->get_user_submission($student1->id, true);
+        $submission2 = $assign->get_user_submission($student2->id, true);
+
         // Ensure they have run out of time so the draft will be submitted.
         $submissionparams = [
-            'id' => $submission->id,
+            'id' => $submission1->id,
             'timecreated' => (time() - 1626948853)
         ];
         $DB->update_record('assign_submission', $submissionparams);
 
+        $submissionparams['id'] = $submission2->id;
+        $DB->update_record('assign_submission', $submissionparams);
+
         $autosaveparams = [
             'elementid' => 'id_responsetext_editor',
-            'userid' => $student->id,
+            'userid' => $student1->id,
             'contextid' => $context->id,
             'drafttext' => ' '
         ];
         $DB->insert_record('editor_atto_autosave', $autosaveparams);
 
+        $autosaveparams2 = $autosaveparams;
+        $autosaveparams2['userid'] = $student2->id;
+        $DB->insert_record('editor_atto_autosave', $autosaveparams2);
+
         $statusparams = [
-            'userid' => $student->id,
+            'userid' => $student1->id,
             'assignment' => $context->id,
             'timestarted' => (time() - 1626948853)
         ];
+        $DB->insert_record('timedonline_status', $statusparams);
 
+        $statusparams['userid'] = $student2->id;
         $DB->insert_record('timedonline_status', $statusparams);
 
         $sink = $this->redirectEvents();
         $task = \core\task\manager::get_scheduled_task('assignsubmission_timedonline\task\submission_sweep');
         $task->execute();
         $events = $sink->get_events();
-        // Notification, Submitted, and Swept.
+        // Notification, Submitted, and Swept for two submissions.
         $this->assertCount(0, $events, 'Submission should not happen with blank draft text');
         $response = $DB->get_records('assignsubmission_timedonline');
         $this->assertEmpty($response);
+        $submissions = $DB->get_records_menu("assign_submission", [], '', 'id,status');
+        foreach ($submissions as $status) {
+            $this->assertEquals('new', $status);
+        }
 
         $autosaveparams['drafttext'] = 'student submission';
+        $autosaveparams2['drafttext'] = 'student submission';
+
         $DB->delete_records('editor_atto_autosave');
         $DB->insert_record('editor_atto_autosave', $autosaveparams);
+        $DB->insert_record('editor_atto_autosave', $autosaveparams2);
 
         $sink = $this->redirectEvents();
         $task = \core\task\manager::get_scheduled_task('assignsubmission_timedonline\task\submission_sweep');
         $task->execute();
         $events = $sink->get_events();
-        // Notification, Submitted, and Swept.
-        $this->assertCount(3, $events);
+        // Notification, Submitted, and Swept for two submissions.
+        $this->assertCount(6, $events, 'Submissions should have happene with non blank draft  text');
         $response = $DB->get_records('assignsubmission_timedonline');
         $response = reset($response);
         $this->assertEquals('student submission', $response->responsetext);
+        $submissions = $DB->get_records_menu("assign_submission", [], '', 'id,status');
+        foreach ($submissions as $status) {
+            $this->assertEquals('submitted', $status);
+        }
     }
 
     /**
@@ -106,13 +130,15 @@ class events_test extends advanced_testcase {
         global $DB;
 
         $course = $this->getDataGenerator()->create_course();
-        $student = $this->getDataGenerator()->create_and_enrol($course, 'student');
+        $student1 = $this->getDataGenerator()->create_and_enrol($course, 'student');
+        $student2 = $this->getDataGenerator()->create_and_enrol($course, 'student');
+
         $assign = $this->create_instance($course);
         $context = $assign->get_context();
         // Should be a method but I don't know which.
         $instanceid = $DB->get_field('context', 'instanceid', ['id' => $context->id]);
 
-        $submission = $assign->get_user_submission($student->id, true);
+        $submission1 = $assign->get_user_submission($student1->id, true);
         $data = (object) [
             'responsetext_editor' => [
                 'text' => 'Submission text',
@@ -124,8 +150,8 @@ class events_test extends advanced_testcase {
         $sink = $this->redirectEvents();
         $plugin = $assign->get_submission_plugin_by_type('timedonline');
 
-        $plugin->save($submission, $data);
-        $format = $plugin->get_editor_format('timedonline', $submission->id);
+        $plugin->save($submission1, $data);
+        $format = $plugin->get_editor_format('timedonline', $submission1->id);
         $this->assertEquals(FORMAT_HTML, $format);
         $events = $sink->get_events();
 
@@ -135,10 +161,10 @@ class events_test extends advanced_testcase {
         $this->assertInstanceOf('\assignsubmission_timedonline\event\submission_created', $event);
         $this->assertEquals($context->id, $event->contextid);
         $this->assertEquals($course->id, $event->courseid);
-        $this->assertEquals($submission->id, $event->other['submissionid']);
-        $this->assertEquals($submission->attemptnumber, $event->other['submissionattempt']);
-        $this->assertEquals($submission->status, $event->other['submissionstatus']);
-        $this->assertEquals($submission->userid, $event->relateduserid);
+        $this->assertEquals($submission1->id, $event->other['submissionid']);
+        $this->assertEquals($submission1->attemptnumber, $event->other['submissionattempt']);
+        $this->assertEquals($submission1->status, $event->other['submissionstatus']);
+        $this->assertEquals($submission1->userid, $event->relateduserid);
     }
     public function test_set_status() {
         global $DB;

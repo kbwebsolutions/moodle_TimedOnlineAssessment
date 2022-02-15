@@ -16,12 +16,9 @@
 
 /**
  * Sweep submissions that were not submitted by the user.
- * If the user is offline and the timelimit has passed
- * this will submit the last text entered into the auto_autosave
- * buffer.
  *
  * @package    assignsubmission_timedonline
- * @copyright  2021 Titus {@link http://www.tituslearning.com}
+ * @copyright  2022 Titus {@link http://www.tituslearning.com}
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 namespace assignsubmission_timedonline\task;
@@ -29,9 +26,18 @@ namespace assignsubmission_timedonline\task;
 defined('MOODLE_INTERNAL') || die();
 
 require_once($CFG->dirroot . '/mod/assign/locallib.php');
-
+/**
+ * Extends core scheduled task
+ *
+ * @package    assignsubmission_timedonline
+ * @copyright  2022 Titus {@link http://www.tituslearning.com}
+ * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ */
 class submission_sweep extends \core\task\scheduled_task {
 
+    /**
+     * Called automatically by cron
+     */
     public function execute() {
         if (get_config('assignsubmission_timedonline', 'enable_submission_sweep')) {
             if ($overtimesubmission = $this->get_submissions()) {
@@ -105,7 +111,7 @@ class submission_sweep extends \core\task\scheduled_task {
     /**
      * Get submissions that have gone overtime
      *
-     * @return void
+     * @return array
      */
     public function get_submissions() : array {
         global $DB;
@@ -114,26 +120,24 @@ class submission_sweep extends \core\task\scheduled_task {
                 JOIN {assign_plugin_config} apc
                   ON apc.assignment = asub.assignment
                 JOIN {timedonline_status} tos
-                   ON tos.userid = asub.userid
-                  AND tos.assignment = tos.assignment
-               WHERE asub.status = 'new'
-                  OR asub.status = 'draft'
+                  ON tos.userid = asub.userid
+               WHERE (asub.status = 'new'
+                  OR asub.status = 'draft')
                  AND apc.plugin = 'timedonline'";
         $newsubmissions = $DB->get_records_sql($sqlnewsubmissions);
-
+        $ids = array_keys($newsubmissions);
+        list($insql, $inparams) = $DB->get_in_or_equal($ids);
         if ($newsubmissions) {
-            $sql = "SELECT asub.id As submissionid,asub.userid,asub.assignment
+            $sql = "SELECT asub.id As submissionid, asub.userid, asub.assignment
                       FROM {assign_submission} asub
                       JOIN {assign_plugin_config} apc
                         ON apc.assignment = asub.assignment
                      WHERE apc.name = 'timelimit'
                        AND plugin = 'timedonline'
-                       AND (
-                            unix_timestamp(now()) > (asub.timecreated + (apc.value * 60))
-                        )
-                       AND asub.id
-                        IN (".$sqlnewsubmissions.")";
-            $overtimesubmission = $DB->get_records_sql($sql);
+                       AND (asub.timecreated + (apc.value * 60)) < ?
+                       AND asub.id ". $insql;
+            array_unshift($inparams, time());
+            $overtimesubmission = $DB->get_records_sql($sql, $inparams);
             return $overtimesubmission;
         } else {
             return [];
