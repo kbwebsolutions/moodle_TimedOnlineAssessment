@@ -22,16 +22,17 @@
  * @author    Marcus Green
  * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
+namespace assignsubmission_timedonline;
 
 defined('MOODLE_INTERNAL') || die();
 
 global $CFG;
 require_once($CFG->dirroot . '/mod/assign/tests/generator.php');
 use assignsubmission_timedonline\observer;
-class locallib_test extends advanced_testcase {
+class locallib_test extends \advanced_testcase {
 
     // Use the generator helper.
-    use mod_assign_test_generator;
+    use \mod_assign_test_generator;
 
     /**
      * Test that end time is calculated with an extreme number of minutes

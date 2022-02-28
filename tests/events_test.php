@@ -22,16 +22,17 @@
  * @author    Marcus Green
  * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
+namespace assignsubmission_timedonline;
 
 defined('MOODLE_INTERNAL') || die();
 
 global $CFG;
 require_once($CFG->dirroot . '/mod/assign/tests/generator.php');
 use assignsubmission_timedonline\observer;
-class events_test extends advanced_testcase {
+class events_test extends \advanced_testcase {
 
     // Use the generator helper.
-    use mod_assign_test_generator;
+    use \mod_assign_test_generator;
 
     /**
      * Test that the assessable_uploaded event is fired when an online text submission is saved.
@@ -76,6 +77,7 @@ class events_test extends advanced_testcase {
         $autosaveparams2 = $autosaveparams;
         $autosaveparams2['userid'] = $student2->id;
         $DB->insert_record('editor_atto_autosave', $autosaveparams2);
+        $DB->delete_records('timedonline_status');
 
         $statusparams = [
             'userid' => $student1->id,
@@ -83,7 +85,6 @@ class events_test extends advanced_testcase {
             'timestarted' => (time() - 1626948853)
         ];
         $DB->insert_record('timedonline_status', $statusparams);
-
         $statusparams['userid'] = $student2->id;
         $DB->insert_record('timedonline_status', $statusparams);
 
@@ -94,11 +95,21 @@ class events_test extends advanced_testcase {
         // Notification, Submitted, and Swept for two submissions.
         $this->assertCount(0, $events, 'Submission should not happen with blank draft text');
         $response = $DB->get_records('assignsubmission_timedonline');
+        // No Submissions even though the time has expired because text was empty.
         $this->assertEmpty($response);
         $submissions = $DB->get_records_menu("assign_submission", [], '', 'id,status');
         foreach ($submissions as $status) {
             $this->assertEquals('new', $status);
         }
+
+        // Set timestarted way to the future so they have not run out of time.
+        $submissionparams = [
+            'id' => $submission1->id,
+            'timecreated' => (time() + 100000)
+        ];
+        $DB->update_record('assign_submission', $submissionparams);
+        $submissionparams['id'] = $submission2->id;
+        $DB->update_record('assign_submission', $submissionparams);
 
         $autosaveparams['drafttext'] = 'student submission';
         $autosaveparams2['drafttext'] = 'student submission';
@@ -111,7 +122,25 @@ class events_test extends advanced_testcase {
         $task = \core\task\manager::get_scheduled_task('assignsubmission_timedonline\task\submission_sweep');
         $task->execute();
         $events = $sink->get_events();
-        // Notification, Submitted, and Swept for two submissions.
+        // No events becauses no submissions made as time has not run out.
+        $this->assertCount(0, $events, 'Submission should not happen until the time has run out');
+        $response = $DB->get_records('assignsubmission_timedonline');
+        $response = reset($response);
+        $this->assertFalse($response);
+
+        $submissionparams = [
+            'id' => $submission1->id,
+            'timecreated' => (time() - 1626948853)
+        ];
+        $DB->update_record('assign_submission', $submissionparams);
+        $submissionparams['id'] = $submission2->id;
+        $DB->update_record('assign_submission', $submissionparams);
+
+        $sink = $this->redirectEvents();
+        $task = \core\task\manager::get_scheduled_task('assignsubmission_timedonline\task\submission_sweep');
+        $task->execute();
+        $events = $sink->get_events();
+
         $this->assertCount(6, $events, 'Submissions should have happene with non blank draft  text');
         $response = $DB->get_records('assignsubmission_timedonline');
         $response = reset($response);

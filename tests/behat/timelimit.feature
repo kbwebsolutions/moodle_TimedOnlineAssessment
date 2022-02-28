@@ -76,7 +76,7 @@ Feature: In an assignment, show question after Add susubmission is clicked
     And I follow "Assignment1"
     And I press "Add submission"
     And I set the field "Add your response" to "Student response"
-    And I wait "8" seconds
+    And I wait "10" seconds
     # This shows that autosubmit has happened
     Then I should see "Submitted for grading"
     # This shows that the response is visible (but not editable)
@@ -113,7 +113,7 @@ Feature: In an assignment, show question after Add susubmission is clicked
     And I press "Add submission"
     And I set the field "Add your response" to "Student response"
     And I am on "Course 1" course homepage
-    And I wait "8" seconds
+    And I wait "10" seconds
     And I follow "Assignment1"
     And I press "Add submission"
     # It takes a few seconds for the ajaxrequest to complete

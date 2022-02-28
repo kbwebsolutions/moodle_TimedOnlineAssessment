@@ -62,15 +62,16 @@ class submission_sweep extends \core\task\scheduled_task {
                       JOIN {course_modules} cm
                         ON cm.id = ctx.instanceid
                      WHERE cm.instance = :assignment
-                       AND eas.id IN (
-                              SELECT MAX(id)
-                                FROM {editor_atto_autosave}
-                               WHERE elementid = 'id_responsetext_editor'
-                                 AND userid = :userid
-                    )";
+                       AND userid= :userid
+                       AND elementid = 'id_responsetext_editor'";
             $params = ['userid' => $submission->userid, 'assignment' => $submission->assignment ];
             $autosave = $DB->get_record_sql($sql, $params);
             if (!isset($autosave->drafttext) || ctype_space($autosave->drafttext)) {
+                global $CFG;
+                if ($CFG->debugdeveloper) {
+                    mtrace(PHP_EOL.'No processing for cm.instance:'.$submission->assignment.' userid:'.$submission->userid.
+                        '  draft is whitespace', '');
+                }
                 continue;
             }
             $data = (object) [
@@ -115,7 +116,7 @@ class submission_sweep extends \core\task\scheduled_task {
      */
     public function get_submissions() : array {
         global $DB;
-        $sqlnewsubmissions = "SELECT DISTINCT asub.id As submissionid
+        $sqlnewsubmissions = "SELECT DISTINCT asub.id, asub.timecreated
                 FROM {assign_submission} asub
                 JOIN {assign_plugin_config} apc
                   ON apc.assignment = asub.assignment
@@ -125,23 +126,29 @@ class submission_sweep extends \core\task\scheduled_task {
                   OR asub.status = 'draft')
                  AND apc.plugin = 'timedonline'";
         $newsubmissions = $DB->get_records_sql($sqlnewsubmissions);
-        $ids = array_keys($newsubmissions);
-        list($insql, $inparams) = $DB->get_in_or_equal($ids);
+        $overtimesubmissisons = [];
         if ($newsubmissions) {
-            $sql = "SELECT asub.id As submissionid, asub.userid, asub.assignment
+            foreach ($newsubmissions as $submission) {
+                $sql = "SELECT asub.id As submissionid, asub.userid, asub.assignment
                       FROM {assign_submission} asub
                       JOIN {assign_plugin_config} apc
                         ON apc.assignment = asub.assignment
                      WHERE apc.name = 'timelimit'
                        AND plugin = 'timedonline'
-                       AND (asub.timecreated + (apc.value * 60)) < ?
-                       AND asub.id ". $insql;
-            array_unshift($inparams, time());
-            $overtimesubmission = $DB->get_records_sql($sql, $inparams);
-            return $overtimesubmission;
-        } else {
-            return [];
+                       AND (:timecreated + (apc.value * 60))  < :timenow
+                       AND asub.id = :submissionid";
+                $params = [
+                    'timecreated' => $submission->timecreated,
+                    'submissionid' => $submission->id,
+                    'timenow' => time()
+                ];
+                if ($record = $DB->get_record_sql($sql, $params)) {
+                    $overtimesubmissisons[] = $record;
+
+                }
+            }
         }
+        return $overtimesubmissisons;
 
     }
     /**
