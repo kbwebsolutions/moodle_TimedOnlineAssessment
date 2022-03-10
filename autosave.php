@@ -23,13 +23,17 @@
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-define('AJAX_SCRIPT', true);
-
 require_once(__DIR__ . '/../../../../config.php');
 require_once($CFG->dirroot . '/mod/assign/externallib.php');
 require_login();
 
-$responsetext = optional_param('responsetext', '', PARAM_TEXT);
+if (!defined('AJAX_SCRIPT')) {
+    define('AJAX_SCRIPT', true);
+}
+
+global $USER;
+
+$responsetext = optional_param('responsetext', '', PARAM_RAW);
 $assignmentid = optional_param('assignmentid', '', PARAM_INT);
 
 $params = ['assignment' => $assignmentid, 'groupid' => 0, 'userid' => $USER->id];

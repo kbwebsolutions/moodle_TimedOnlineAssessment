@@ -55,7 +55,7 @@ class submission_sweep extends \core\task\scheduled_task {
     public function submit_assign(array $overtimesubmission) : void {
         global $DB;
         foreach ($overtimesubmission as $submission) {
-            $sql = "SELECT eas.drafttext
+            $sql = "SELECT eas.id, eas.drafttext
                       FROM {editor_atto_autosave} eas
                       JOIN {context} ctx
                         ON ctx.id =  eas.contextid
@@ -84,6 +84,7 @@ class submission_sweep extends \core\task\scheduled_task {
             ];
 
             $DB->insert_record("assignsubmission_timedonline", $data);
+            $DB->delete_records('editor_atto_autosave', ['id' => $autosave->id ]);
             $data = (object)[
                 'submission' => $submission->assignment,
                 'userid' => $submission->userid
@@ -96,7 +97,9 @@ class submission_sweep extends \core\task\scheduled_task {
 
             // Log entry to indicate the submission was done via the swept event.
             $user = \core_user::get_user($submission->userid);
-            $other = 'Timelimit exceeded, text from editor buffer swept for grading';
+            $other = 'Timelimit exceeded, edit buffer swept for grading: ';
+            $other .= 'Submission start:'.gmdate("Y-m-d\TH:i:s\Z", $submission->submissionstart);
+            $other .= ' Submission modified:'.gmdate("Y-m-d\TH:i:s\Z", $submission->submissionmodified);
             $eventdata = [
                 'context' => $context,
                 'relateduserid' => $user->id,
@@ -129,7 +132,9 @@ class submission_sweep extends \core\task\scheduled_task {
         $overtimesubmissisons = [];
         if ($newsubmissions) {
             foreach ($newsubmissions as $submission) {
-                $sql = "SELECT asub.id As submissionid, asub.userid, asub.assignment
+                $sql = "SELECT asub.id As submissionid, asub.userid, asub.assignment,
+                        asub.timecreated as submissionstart,
+                        asub.timemodified as submissionmodified
                       FROM {assign_submission} asub
                       JOIN {assign_plugin_config} apc
                         ON apc.assignment = asub.assignment

@@ -101,7 +101,6 @@ class events_test extends \advanced_testcase {
         foreach ($submissions as $status) {
             $this->assertEquals('new', $status);
         }
-
         // Set timestarted way to the future so they have not run out of time.
         $submissionparams = [
             'id' => $submission1->id,
@@ -111,8 +110,8 @@ class events_test extends \advanced_testcase {
         $submissionparams['id'] = $submission2->id;
         $DB->update_record('assign_submission', $submissionparams);
 
-        $autosaveparams['drafttext'] = 'student submission';
-        $autosaveparams2['drafttext'] = 'student submission';
+        $autosaveparams['drafttext'] = '<p>student submission</p>';
+        $autosaveparams2['drafttext'] = '<p>student submission</p>';
 
         $DB->delete_records('editor_atto_autosave');
         $DB->insert_record('editor_atto_autosave', $autosaveparams);
@@ -144,11 +143,13 @@ class events_test extends \advanced_testcase {
         $this->assertCount(6, $events, 'Submissions should have happene with non blank draft  text');
         $response = $DB->get_records('assignsubmission_timedonline');
         $response = reset($response);
-        $this->assertEquals('student submission', $response->responsetext);
+        $this->assertEquals('<p>student submission</p>', $response->responsetext);
         $submissions = $DB->get_records_menu("assign_submission", [], '', 'id,status');
         foreach ($submissions as $status) {
             $this->assertEquals('submitted', $status);
         }
+        // All draft text should be deleted after submission.
+        $this->assertEmpty($DB->count_records('editor_atto_autosave'));
     }
 
     /**
