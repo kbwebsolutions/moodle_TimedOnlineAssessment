@@ -101,14 +101,11 @@ class events_test extends \advanced_testcase {
         foreach ($submissions as $status) {
             $this->assertEquals('new', $status);
         }
-        // Set timestarted way to the future so they have not run out of time.
-        $submissionparams = [
-            'id' => $submission1->id,
-            'timecreated' => (time() + 100000)
-        ];
-        $DB->update_record('assign_submission', $submissionparams);
-        $submissionparams['id'] = $submission2->id;
-        $DB->update_record('assign_submission', $submissionparams);
+
+        $statusrecords = $DB->get_records('timedonline_status');
+        foreach ($statusrecords as $record) {
+            $DB->update_record('timedonline_status', ['id' => $record->id, 'timestarted' => (time() + 10000)]);
+        }
 
         $autosaveparams['drafttext'] = '<p>student submission</p>';
         $autosaveparams2['drafttext'] = '<p>student submission</p>';
@@ -127,13 +124,10 @@ class events_test extends \advanced_testcase {
         $response = reset($response);
         $this->assertFalse($response);
 
-        $submissionparams = [
-            'id' => $submission1->id,
-            'timecreated' => (time() - 1626948853)
-        ];
-        $DB->update_record('assign_submission', $submissionparams);
-        $submissionparams['id'] = $submission2->id;
-        $DB->update_record('assign_submission', $submissionparams);
+        $statusrecords = $DB->get_records('timedonline_status');
+        foreach ($statusrecords as $record) {
+            $DB->update_record('timedonline_status', ['id' => $record->id, 'timestarted' => (time() - 1626948853)]);
+        }
 
         $sink = $this->redirectEvents();
         $task = \core\task\manager::get_scheduled_task('assignsubmission_timedonline\task\submission_sweep');

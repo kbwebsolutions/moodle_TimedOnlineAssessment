@@ -119,7 +119,7 @@ class submission_sweep extends \core\task\scheduled_task {
      */
     public function get_submissions() : array {
         global $DB;
-        $sqlnewsubmissions = "SELECT DISTINCT asub.id, asub.timecreated
+        $sqlnewsubmissions = "SELECT DISTINCT asub.id, tos.timestarted
                 FROM {assign_submission} asub
                 JOIN {assign_plugin_config} apc
                   ON apc.assignment = asub.assignment
@@ -140,10 +140,10 @@ class submission_sweep extends \core\task\scheduled_task {
                         ON apc.assignment = asub.assignment
                      WHERE apc.name = 'timelimit'
                        AND plugin = 'timedonline'
-                       AND (:timecreated + (apc.value * 60))  < :timenow
+                       AND (:timestarted + (apc.value * 60))  < :timenow
                        AND asub.id = :submissionid";
                 $params = [
-                    'timecreated' => $submission->timecreated,
+                    'timestarted' => $submission->timestarted,
                     'submissionid' => $submission->id,
                     'timenow' => time()
                 ];

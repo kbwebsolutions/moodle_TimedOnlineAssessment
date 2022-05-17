@@ -6,6 +6,8 @@ Feature: In an assignment, submit when timelimit runs out
     once a minute.
 
   Background:
+    Given the following config values are set as admin:
+        | autosavefrequency | 60 | editor_atto |
     Given the following "courses" exist:
         | fullname | shortname | format | enablecompletion |
         | Course 1 | C1        | topics | 1                |
